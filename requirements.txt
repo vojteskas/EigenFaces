@@ -1,0 +1,8 @@
+opencv-python
+facedetector-py
+filetype
+numpy
+pytest
+tf-keras
+scikit-learn
+tqdm
