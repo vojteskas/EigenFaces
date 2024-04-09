@@ -14,6 +14,9 @@ PADDING = 1.0
 
 
 def main():
+    """
+    Process all videos in INPUT_DIR's subdirs and extract faces using FaceDetector. Save faces to OUTPUT_DIR.
+    """
     for subdir in os.listdir(INPUT_DIR):
         if not os.path.isdir(os.path.join(INPUT_DIR, subdir)):
             continue
@@ -45,8 +48,9 @@ def main():
                         bottom = pivotY + bbox["height"] / 2.0 * PADDING
                         cropped = img.crop((left, top, right, bottom))
                         cropped.save(os.path.join(output_dir, f"{video}_{i}_{n}.jpg"))
+                    break  # Only process the first frame, remove this line to process all frames
                 else:
-                    break
+                    break  # End of video
                 i += 1
             stream.release()
             cv2.destroyAllWindows()
