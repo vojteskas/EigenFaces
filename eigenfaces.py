@@ -127,26 +127,36 @@ class Eigenfaces_base:
 
     def plot_comparison(self, real_face, fake_face, subtitle: str = ""):
         assert self.eigenfaces is not None, "Model has not been fitted before plotting"
-        real_weight = self.eigenfaces @ (real_face - self.pca.mean_)
-        fake_weight = self.eigenfaces @ (fake_face - self.pca.mean_)
-        real_weight = real_weight + self.pca.mean_
-        fake_weight = fake_weight + self.pca.mean_
-        real_weight = (real_weight - real_weight.min()) / (real_weight.max() - real_weight.min())
-        fake_weight = (fake_weight - fake_weight.min()) / (fake_weight.max() - fake_weight.min())
+        # real_weight = self.eigenfaces @ (real_face - self.pca.mean_)
+        # fake_weight = self.eigenfaces @ (fake_face - self.pca.mean_)
 
+        # print(f"shapes: real face {real_face.shape}, fake face {fake_face.shape}")
+        # print(f"shapes: real weight {real_weight.shape}, fake weight {fake_weight.shape}")
+        # print(f"shapes: eigenfaces {self.eigenfaces.shape}, pca.mean_ {self.pca.mean_.shape}")
+
+        # real_weight = real_weight + self.pca.mean_
+        # fake_weight = fake_weight + self.pca.mean_
+        # real_weight = (real_weight - real_weight.min()) / (real_weight.max() - real_weight.min())
+        # fake_weight = (fake_weight - fake_weight.min()) / (fake_weight.max() - fake_weight.min())
+
+        real_face = real_face - self.pca.mean_
+        fake_face = fake_face - self.pca.mean_
+
+        plt.figure(figsize=(10, 5))
         fig, ax = plt.subplots(1, 2)
         if self.grayscale:
-            ax[0].imshow(real_weight.reshape(128, 128), cmap="gray")
-            ax[1].imshow(fake_weight.reshape(128, 128), cmap="gray")
+            ax[0].imshow(real_face.reshape(128, 128), cmap="gray")
+            ax[1].imshow(fake_face.reshape(128, 128), cmap="gray")
         else:
-            ax[0].imshow(real_weight.reshape(128, 128, 3))
-            ax[1].imshow(fake_weight.reshape(128, 128, 3))
-        ax[0].set_title("Example of real face in eigenface space")
-        ax[1].set_title("Example of fake face in eigenface space")
+            ax[0].imshow(real_face.reshape(128, 128, 3))
+            ax[1].imshow(fake_face.reshape(128, 128, 3))
+        ax[0].set_title("Real face in eigenface space")
+        ax[1].set_title("Fake face in eigenface space")
         color = "grayscale" if self.grayscale else "RGB"
         space = "spectrum" if self.spectral else "image"
         fig.suptitle(f"Comparison of {subtitle} - {color} {space}")
         plt.savefig(f"comparison_{subtitle}_{color}_{space}.png")
+        plt.close()
 
 
 class Eigenfaces(Eigenfaces_base):
@@ -210,8 +220,8 @@ class EF_base:
     def plot(self):
         self.ef.plot()
 
-    def plot_comparison(self, real_face, fake_face):
-        self.ef.plot_comparison(real_face, fake_face)
+    def plot_comparison(self, real_face, fake_face, subtitle: str = ""):
+        self.ef.plot_comparison(real_face, fake_face, subtitle)
 
 
 class EF_SVM(EF_base):
@@ -264,14 +274,26 @@ def main(variant: Literal["eigenfaces", "ef_svm", "ef_lda", "ef_qda"]):
         else:
             raise ValueError("Invalid variant")
 
-        train_faces, train_labels = load_faces(dir=TRAIN_DIR)
-        ef.fit(train_faces, train_labels)
-        eval_faces, eval_labels = load_faces(dir=EVAL_DIR)
+        train_faces, train_labels = load_faces(dir=TRAIN_DIR, grayscale=g, spectral=s)
+        ef.fit(train_faces, train_labels, n_components=50)
+        eval_faces, eval_labels = load_faces(dir=EVAL_DIR, grayscale=g, spectral=s)
         accuracy = ef.eval(eval_faces, eval_labels)
         print(f"{'Grayscale' if g else 'RGB'} {'spectrum' if s else 'image'} accuracy: {accuracy*100:.2f}%")
 
         real_face, fake_face = get_real_fake_face(eval_faces, eval_labels)
-        ef.plot_comparison(real_face, fake_face)
+        plt.figure(figsize=(10, 5))
+        fig, ax = plt.subplots(1, 2)
+        if g:
+            ax[0].imshow(real_face.reshape(128, 128), cmap="gray")
+            ax[1].imshow(fake_face.reshape(128, 128), cmap="gray")
+        else:
+            ax[0].imshow(real_face.reshape(128, 128, 3))
+            ax[1].imshow(fake_face.reshape(128, 128, 3))
+        ax[0].set_title("Real face")
+        ax[1].set_title("Fake face")
+        fig.suptitle(f"Real vs Fake - {'grayscale' if g else 'RGB'} {'spectrum' if s else 'image'}")
+        plt.savefig(f"rf_{variant}_{'grayscale' if g else 'RGB'}_{'spectrum' if s else 'image'}.png")
+        ef.plot_comparison(real_face, fake_face, subtitle=variant)
         # ef.plot()
 
 
