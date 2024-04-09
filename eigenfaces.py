@@ -8,6 +8,7 @@ import numpy as np
 from PIL import Image
 from scipy.fftpack import dct
 from sklearn.decomposition import PCA
+from sklearn.discriminant_analysis import LinearDiscriminantAnalysis, QuadraticDiscriminantAnalysis
 from sklearn.metrics import euclidean_distances
 from sklearn.svm import SVC
 
@@ -59,6 +60,19 @@ def load_faces(dir=TRAIN_DIR, grayscale=True, spectral=False) -> tuple[np.ndarra
     return np.array(faces), np.array(labels)
 
 
+def get_real_fake_face(faces, labels) -> tuple[np.ndarray, np.ndarray]:
+    """
+    Get a pair of real and fake faces
+
+    :param faces: List or array of faces
+    :param labels: List or array of corresponding labels
+    :return: Face
+    """
+    real_index = np.random.choice(np.where(labels == 0)[0])
+    fake_index = np.random.choice(np.where(labels == 1)[0])
+    return faces[real_index], faces[fake_index]
+
+
 class Eigenfaces_base:
     def __init__(self, grayscale=True, spectral=False):
         self.pca = PCA()
@@ -82,7 +96,7 @@ class Eigenfaces_base:
         first_eigenface = self.eigenfaces[0]
         mean_eigenface = self.eigenfaces.mean(axis=0)
         sum_eigenface = self.eigenfaces.sum(axis=0)
-        # Normalize to 0-255
+        # Normalize
         pca_mean = (pca_mean - pca_mean.min()) / (pca_mean.max() - pca_mean.min())
         first_eigenface = (first_eigenface - first_eigenface.min()) / (
             first_eigenface.max() - first_eigenface.min()
@@ -110,6 +124,29 @@ class Eigenfaces_base:
             f"Eigenfaces - {'grayscale' if self.grayscale else 'RGB'} {'spectrum' if self.spectral else 'image'}"
         )
         plt.show()
+
+    def plot_comparison(self, real_face, fake_face, subtitle: str = ""):
+        assert self.eigenfaces is not None, "Model has not been fitted before plotting"
+        real_weight = self.eigenfaces @ (real_face - self.pca.mean_)
+        fake_weight = self.eigenfaces @ (fake_face - self.pca.mean_)
+        real_weight = real_weight + self.pca.mean_
+        fake_weight = fake_weight + self.pca.mean_
+        real_weight = (real_weight - real_weight.min()) / (real_weight.max() - real_weight.min())
+        fake_weight = (fake_weight - fake_weight.min()) / (fake_weight.max() - fake_weight.min())
+
+        fig, ax = plt.subplots(1, 2)
+        if self.grayscale:
+            ax[0].imshow(real_weight.reshape(128, 128), cmap="gray")
+            ax[1].imshow(fake_weight.reshape(128, 128), cmap="gray")
+        else:
+            ax[0].imshow(real_weight.reshape(128, 128, 3))
+            ax[1].imshow(fake_weight.reshape(128, 128, 3))
+        ax[0].set_title("Example of real face in eigenface space")
+        ax[1].set_title("Example of fake face in eigenface space")
+        color = "grayscale" if self.grayscale else "RGB"
+        space = "spectrum" if self.spectral else "image"
+        fig.suptitle(f"Comparison of {subtitle} - {color} {space}")
+        plt.savefig(f"comparison_{subtitle}_{color}_{space}.png")
 
 
 class Eigenfaces(Eigenfaces_base):
@@ -160,9 +197,26 @@ class Eigenfaces(Eigenfaces_base):
         return accuracy
 
 
-class EF_SVM:
+class EF_base:
     def __init__(self, grayscale=True, spectral=False):
         self.ef = Eigenfaces(grayscale, spectral)
+
+    def fit(self):
+        raise NotImplementedError("Subclass must implement this method")
+
+    def eval(self):
+        raise NotImplementedError("Subclass must implement this method")
+
+    def plot(self):
+        self.ef.plot()
+
+    def plot_comparison(self, real_face, fake_face):
+        self.ef.plot_comparison(real_face, fake_face)
+
+
+class EF_SVM(EF_base):
+    def __init__(self, grayscale=True, spectral=False):
+        super().__init__(grayscale, spectral)
         self.clf = SVC()
 
     def fit(self, train_faces, train_labels, n_components=0):
@@ -177,7 +231,24 @@ class EF_SVM:
         return accuracy
 
 
-def main(variant: Literal["eigenfaces", "ef_svm"]):
+class EF_DiscriminantAnalysis_Gaussian(EF_base):
+    def __init__(self, grayscale=True, spectral=False, variant: Literal["lda", "qda"] = "lda"):
+        super().__init__(grayscale, spectral)
+        self.da = LinearDiscriminantAnalysis() if variant == "lda" else QuadraticDiscriminantAnalysis()
+
+    def fit(self, train_faces, train_labels, n_components=0):
+        self.ef.fit(train_faces, train_labels, n_components)
+        self.da.fit(self.ef.weights.T, train_labels)
+
+    def eval(self, test_faces, test_labels) -> float:
+        # Transform test data to eigenface space
+        test_weights = self.ef.eigenfaces @ (test_faces - self.ef.pca.mean_).T
+        preds = self.da.predict(test_weights.T)
+        accuracy = np.mean(preds == test_labels)
+        return accuracy
+
+
+def main(variant: Literal["eigenfaces", "ef_svm", "ef_lda", "ef_qda"]):
     for conf in range(4):
         g = conf < 2
         s = conf % 2 == 1
@@ -186,6 +257,10 @@ def main(variant: Literal["eigenfaces", "ef_svm"]):
             ef = Eigenfaces(grayscale=g, spectral=s)
         elif variant == "ef_svm":
             ef = EF_SVM(grayscale=g, spectral=s)
+        elif variant == "ef_lda":
+            ef = EF_DiscriminantAnalysis_Gaussian(grayscale=g, spectral=s, variant="lda")
+        elif variant == "ef_qda":
+            ef = EF_DiscriminantAnalysis_Gaussian(grayscale=g, spectral=s, variant="qda")
         else:
             raise ValueError("Invalid variant")
 
@@ -193,15 +268,15 @@ def main(variant: Literal["eigenfaces", "ef_svm"]):
         ef.fit(train_faces, train_labels)
         eval_faces, eval_labels = load_faces(dir=EVAL_DIR)
         accuracy = ef.eval(eval_faces, eval_labels)
-        print(
-            f"{'Grayscale' if g else 'RGB'} {'spectrum' if s else 'image'} accuracy: {accuracy*100:.2f}%"
-        )
+        print(f"{'Grayscale' if g else 'RGB'} {'spectrum' if s else 'image'} accuracy: {accuracy*100:.2f}%")
+
+        real_face, fake_face = get_real_fake_face(eval_faces, eval_labels)
+        ef.plot_comparison(real_face, fake_face)
         # ef.plot()
 
 
 if __name__ == "__main__":
-    print("Eigenfaces:")
-    main("eigenfaces")
-    print("=====================================")
-    print("EF_SVM:")
-    main("ef_svm")
+    for variant in ["eigenfaces", "ef_svm", "ef_lda", "ef_qda"]:
+        print(f"Running {variant}")
+        main(variant)  # type: ignore | run all variants
+        print()
