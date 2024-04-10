@@ -299,7 +299,7 @@ def main(variant: Literal["eigenfaces", "ef_svm", "ef_lda", "ef_qda"]):
 
 def train_for_interactive(n_components=0):
     """
-    Train all models for interactive testing and plotting
+    Train all models for interactive testing and plotting. Takes a few minutes.
 
     Returns a list of lists of trained models. You can access the models as follows:
     - first index: variant, i.e. 0 - Eigenfaces, 1 - EF_SVM, 2 - EF_LDA, 3 - EF_QDA

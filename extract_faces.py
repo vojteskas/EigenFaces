@@ -16,6 +16,12 @@ PADDING = 1.0
 def main():
     """
     Process all videos in INPUT_DIR's subdirs and extract faces using FaceDetector. Save faces to OUTPUT_DIR.
+
+    Extracts only faces from the first frame with the current implementation. Remove the break statement on
+    line 47 to process all frames (may take a long time, consider using OpenCV with CUDA platform, which 
+    requires manual compilation of OpenCV with CUDA support).
+
+    Code inspired by https://github.com/freearhey/face-extractor/tree/master
     """
     for subdir in os.listdir(INPUT_DIR):
         if not os.path.isdir(os.path.join(INPUT_DIR, subdir)):
