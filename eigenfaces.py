@@ -297,6 +297,41 @@ def main(variant: Literal["eigenfaces", "ef_svm", "ef_lda", "ef_qda"]):
         # ef.plot()
 
 
+def train_for_interactive(n_components=0):
+    """
+    Train all models for interactive testing and plotting
+
+    Returns a list of lists of trained models. You can access the models as follows:
+    - first index: variant, i.e. 0 - Eigenfaces, 1 - EF_SVM, 2 - EF_LDA, 3 - EF_QDA
+    - second index: configuration, i.e. 0 - grayscale, 1 - grayscale spectral, 2 - RGB, 3 - RGB spectral
+    Examples: models[0][0] - Eigenfaces grayscale, models[1][4] - EF_SVM RGB spectral
+
+    :param n_components: Number of components to use in PCA. If 0, use all components
+    :return: List of trained models - [[Eigenfaces], [EF_SVM], [EF_LDA], [EF_QDA]]
+    """
+
+    models = [[], [], [], []]
+    for conf in range(4):
+        g = conf < 2
+        s = conf % 2 == 1
+        train_faces, train_labels = load_faces(dir=TRAIN_DIR, grayscale=g, spectral=s)
+        for i, variant in enumerate(["eigenfaces", "ef_svm", "ef_lda", "ef_qda"]):
+            if variant == "eigenfaces":
+                ef = Eigenfaces(grayscale=g, spectral=s)
+            elif variant == "ef_svm":
+                ef = EF_SVM(grayscale=g, spectral=s)
+            elif variant == "ef_lda":
+                ef = EF_DiscriminantAnalysis_Gaussian(grayscale=g, spectral=s, variant="lda")
+            elif variant == "ef_qda":
+                ef = EF_DiscriminantAnalysis_Gaussian(grayscale=g, spectral=s, variant="qda")
+            else:
+                raise ValueError("Invalid variant")
+
+            ef.fit(train_faces, train_labels, n_components)
+            models[i].append(ef)
+    return models
+
+
 if __name__ == "__main__":
     for variant in ["eigenfaces", "ef_svm", "ef_lda", "ef_qda"]:
         print(f"Running {variant}")
