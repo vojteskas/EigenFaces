@@ -1,0 +1,23 @@
+Running eigenfaces
+Grayscale image accuracy: 68.44%
+Grayscale spectrum accuracy: 70.33%
+RGB image accuracy: 70.23%
+RGB spectrum accuracy: 70.23%
+
+Running ef_svm
+Grayscale image accuracy: 83.15%
+Grayscale spectrum accuracy: 83.12%
+RGB image accuracy: 83.12%
+RGB spectrum accuracy: 83.12%
+
+Running ef_lda
+Grayscale image accuracy: 83.56%
+Grayscale spectrum accuracy: 83.39%
+RGB image accuracy: 83.39%
+RGB spectrum accuracy: 83.39%
+
+Running ef_qda
+Grayscale image accuracy: 69.68%
+Grayscale spectrum accuracy: 70.19%
+RGB image accuracy: 67.75%
+RGB spectrum accuracy: 67.75%
