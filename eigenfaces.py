@@ -42,7 +42,9 @@ def load_face(path, grayscale=True, spectral=False) -> np.ndarray:
         return img
 
 
-def load_faces(dir=TRAIN_DIR, grayscale=True, spectral=False) -> tuple[np.ndarray, np.ndarray]:
+def load_faces(
+    dir=TRAIN_DIR, grayscale=True, spectral=False, type: Literal["all", "real", "fake"] = "all"
+) -> tuple[np.ndarray, np.ndarray]:
     """
     Load faces from Celeb-DF-v2-faces dataset
 
@@ -51,6 +53,8 @@ def load_faces(dir=TRAIN_DIR, grayscale=True, spectral=False) -> tuple[np.ndarra
     faces = []
     labels = []
     for subdir in os.listdir(dir):
+        if (type == "real" and "real" not in subdir) or (type == "fake" and "real" in subdir):
+            continue
         working_dir = os.path.join(dir, subdir)
         for file in os.listdir(working_dir):
             path = os.path.join(working_dir, file)
@@ -82,11 +86,11 @@ class Eigenfaces_base:
         self.eigenfaces = None
         self.weights = None
 
-    def fit(self):
+    def fit(self, train_faces, train_labels, n_components=0):
         """Fit PCA to self.faces"""
         raise NotImplementedError("Subclass must implement this method")
 
-    def eval(self):
+    def eval(self, test_faces, test_labels):
         """Evaluate model"""
         raise NotImplementedError("Subclass must implement this method")
 
@@ -105,7 +109,7 @@ class Eigenfaces_base:
             mean_eigenface.max() - mean_eigenface.min()
         )
         sum_eigenface = (sum_eigenface - sum_eigenface.min()) / (sum_eigenface.max() - sum_eigenface.min())
-        fig, ax = plt.subplots(1, 4)
+        fig, ax = plt.subplots(1, 4, figsize=(16, 4))
         if self.grayscale:
             ax[0].imshow(first_eigenface.reshape(128, 128), cmap="gray")
             ax[1].imshow(mean_eigenface.reshape(128, 128), cmap="gray")
@@ -123,7 +127,8 @@ class Eigenfaces_base:
         fig.suptitle(
             f"Eigenfaces - {'grayscale' if self.grayscale else 'RGB'} {'spectrum' if self.spectral else 'image'}"
         )
-        plt.show()
+        # plt.show()
+        # plt.close()
 
     def plot_comparison(self, real_face, fake_face, subtitle: str = ""):
         assert self.eigenfaces is not None, "Model has not been fitted before plotting"
@@ -211,10 +216,10 @@ class EF_base:
     def __init__(self, grayscale=True, spectral=False):
         self.ef = Eigenfaces(grayscale, spectral)
 
-    def fit(self):
+    def fit(self, train_faces, train_labels, n_components=0):
         raise NotImplementedError("Subclass must implement this method")
 
-    def eval(self):
+    def eval(self, test_faces, test_labels):
         raise NotImplementedError("Subclass must implement this method")
 
     def plot(self):
@@ -258,24 +263,47 @@ class EF_DiscriminantAnalysis_Gaussian(EF_base):
         return accuracy
 
 
+def fit_ef_model(
+    variant: Literal["eigenfaces", "ef_svm", "ef_lda", "ef_qda"] = "eigenfaces",
+    grayscale: bool = True,
+    spectral: bool = False,
+    n_components: int = 0,
+    type: Literal["all", "real", "fake"] = "all",
+) -> Eigenfaces_base | EF_base:
+    """
+    The most general customizable function to fit and evaluate a PCA model.
+
+    :param variant: Model variant (Eigenfaces, EF_SVM, EF_LDA, EF_QDA)
+    :param grayscale: Convert to grayscale
+    :param spectral: Convert to spectral domain using DCT
+    :param n_components: Number of components to use in PCA. If 0, use all components
+    :param type: Type of faces to load (all, real, fake)
+
+    :return: Fitted model
+    """
+    if variant == "eigenfaces":
+        ef = Eigenfaces(grayscale=grayscale, spectral=spectral)
+    elif variant == "ef_svm":
+        ef = EF_SVM(grayscale=grayscale, spectral=spectral)
+    elif variant == "ef_lda":
+        ef = EF_DiscriminantAnalysis_Gaussian(grayscale=grayscale, spectral=spectral, variant="lda")
+    elif variant == "ef_qda":
+        ef = EF_DiscriminantAnalysis_Gaussian(grayscale=grayscale, spectral=spectral, variant="qda")
+    else:
+        raise ValueError("Invalid variant")
+
+    train_faces, train_labels = load_faces(dir=TRAIN_DIR, grayscale=grayscale, spectral=spectral, type=type)
+    ef.fit(train_faces, train_labels, n_components)
+    return ef
+
+
 def main(variant: Literal["eigenfaces", "ef_svm", "ef_lda", "ef_qda"]):
     for conf in range(4):
         g = conf < 2
         s = conf % 2 == 1
 
-        if variant == "eigenfaces":
-            ef = Eigenfaces(grayscale=g, spectral=s)
-        elif variant == "ef_svm":
-            ef = EF_SVM(grayscale=g, spectral=s)
-        elif variant == "ef_lda":
-            ef = EF_DiscriminantAnalysis_Gaussian(grayscale=g, spectral=s, variant="lda")
-        elif variant == "ef_qda":
-            ef = EF_DiscriminantAnalysis_Gaussian(grayscale=g, spectral=s, variant="qda")
-        else:
-            raise ValueError("Invalid variant")
+        ef = fit_ef_model(variant=variant, grayscale=g, spectral=s, n_components=50, type="all")
 
-        train_faces, train_labels = load_faces(dir=TRAIN_DIR, grayscale=g, spectral=s)
-        ef.fit(train_faces, train_labels, n_components=50)
         eval_faces, eval_labels = load_faces(dir=EVAL_DIR, grayscale=g, spectral=s)
         accuracy = ef.eval(eval_faces, eval_labels)
         print(f"{'Grayscale' if g else 'RGB'} {'spectrum' if s else 'image'} accuracy: {accuracy*100:.2f}%")
@@ -297,7 +325,7 @@ def main(variant: Literal["eigenfaces", "ef_svm", "ef_lda", "ef_qda"]):
         # ef.plot()
 
 
-def train_for_interactive(n_components=0):
+def train_for_interactive(n_components=0) -> list[list[Eigenfaces_base | EF_base]]:
     """
     Train all models for interactive testing and plotting. Takes a few minutes.
 
@@ -333,7 +361,19 @@ def train_for_interactive(n_components=0):
 
 
 if __name__ == "__main__":
-    for variant in ["eigenfaces", "ef_svm", "ef_lda", "ef_qda"]:
-        print(f"Running {variant}")
-        main(variant)  # type: ignore | run all variants
-        print()
+    variant = "eigenfaces"
+    for conf in range(8):
+        g = conf < 4
+        s = conf % 2 == 1
+        t = "fake" if conf % 4 < 2 else "real"
+
+        print(f"Fitting {variant} - {'grayscale' if g else 'RGB'} {'spectrum' if s else 'image'} {t}...")
+
+        ef = fit_ef_model(variant=variant, grayscale=g, spectral=s, n_components=0, type=t)
+
+        gt = "Grayscale" if g else "RGB"
+        st = "spectrum" if s else "image"
+
+        ef.plot()
+        plt.savefig(f"{variant}_{t}_{gt}_{st}.png")
+        plt.close()
