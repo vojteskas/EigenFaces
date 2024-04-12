@@ -271,7 +271,7 @@ def fit_ef_model(
     type: Literal["all", "real", "fake"] = "all",
 ) -> Eigenfaces_base | EF_base:
     """
-    The most general customizable function to fit and evaluate a PCA model.
+    The most general customizable function to fit a PCA model.
 
     :param variant: Model variant (Eigenfaces, EF_SVM, EF_LDA, EF_QDA)
     :param grayscale: Convert to grayscale
