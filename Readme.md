@@ -22,7 +22,9 @@ All neccessary requirements are present in `requirements.txt` file and can be ea
 
 ## Dataset
 
-Extracted faces from **Celeb-DF-v2** using the `extract_faces.py` script, custom split into train/eval subsets are available for [download from gDrive](https://drive.google.com/file/d/1vGzPvH1nHLRtv2PoRjMMAvqmd35pCE8R/view?usp=sharing). **The same [terms and conditions](https://docs.google.com/forms/d/e/1FAIpQLScoXint8ndZXyJi2Rcy4MvDHkkZLyBFKN43lTeyiG88wrG0rA/viewform) apply for this cropped subset as for the original dataset!**
+Extracted faces from **Celeb-DF-v2** using the `extract_faces.py` script, custom split into train/eval subsets are available for [download from gDrive](https://drive.google.com/file/d/1vGzPvH1nHLRtv2PoRjMMAvqmd35pCE8R/view?usp=sharing). 
+
+⚠️ **The same [terms and conditions](https://docs.google.com/forms/d/e/1FAIpQLScoXint8ndZXyJi2Rcy4MvDHkkZLyBFKN43lTeyiG88wrG0rA/viewform) apply for this cropped subset as for the original dataset!** ⚠️
 
 The split was produced as follows:
 1. Split the data roughly 50-50 as training and evaluation
@@ -57,7 +59,8 @@ The `eigenfaces.py` script also contains a number of helper functions, namely:
     - *grayscale* - whether to convert the input image to grayscale or leave it as is (presumably RGB)
     - *spectral* - whether to transform the loading images using **DCT**. Useful for experimenting in spectral domain.
     - *type* - what images to load. Considering the dataset structure, 'fake' loads only synthesized faces, 'real' only real faces and 'all' loads all faces from the dataset.
-Returned is an array of the *flattened* face/spectrum vectors and corresponding labels (0 for real, 1 for fake)
+
+    Returned is an array of the *flattened* face/spectrum vectors and corresponding labels (0 for real, 1 for fake)
 - `get_real_fake_face` samples a random fake and random real face from the provided arrays of faces and corresponding labels.
 - **`fit_ef_model`** is the versatile core of the project to fit a specific configuration of a PCA model. The parameters allow for customizable setup:
     - *variant*: Model variant (Eigenfaces, EF_SVM, EF_LDA, EF_QDA)
@@ -69,5 +72,6 @@ Returned is an array of the *flattened* face/spectrum vectors and corresponding 
 - `train_for_interactive` is a helper function to train all 16 currently implemented variants for experiments in interactive python shell. It returns a list of lists of trained models. The models can be accessed as follows:
     - first index: variant, i.e. 0 - Eigenfaces, 1 - EF_SVM, 2 - EF_LDA, 3 - EF_QDA
     - second index: configuration, i.e. 0 - grayscale, 1 - grayscale spectral, 2 - RGB, 3 - RGB spectral
+
     For example: `models[0][0]` - Eigenfaces grayscale, `models[1][4]` - EF_SVM RGB spectral
 - The `main` function fits a specific variant in all configurations and evaluates accuracy on test faces.
